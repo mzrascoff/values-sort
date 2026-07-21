@@ -1,6 +1,6 @@
 # values-sort
 
-A quick, anonymous card sort of personal values. People swipe or tap ~40 values into five
+A quick, anonymous card sort of personal values. People swipe or tap 104 values into five
 importance tiers and get a shareable themed "values map." No login. Each submission is stored
 under a random ID and lives at a stable, unlisted link (`/r/{id}`).
 

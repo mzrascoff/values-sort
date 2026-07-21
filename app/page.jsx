@@ -6,9 +6,10 @@ export default function Home() {
     <main className="wrap narrow">
       <h1>What matters most to you?</h1>
       <p className="sub">
-        A quick card sort of {VALUES.length} personal values. Swipe or tap each one into how much
-        it matters, from most important to not important. Takes about three minutes. No login, and
-        it stays anonymous. At the end you get a visual map of your values you can save and share.
+        A card sort of {VALUES.length} personal values. Swipe or tap each one into how much it
+        matters, from most important to not important. The order is shuffled each time, and it takes
+        about seven minutes. No login, and it stays anonymous. At the end you get a visual map of
+        your values you can save and share.
       </p>
       <Link className="btn" href="/sort">Start the sort</Link>
       <p className="muted" style={{ marginTop: 18 }}>

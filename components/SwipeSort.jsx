@@ -12,8 +12,19 @@ function tierFromDx(dx) {
   return Math.min(4, Math.max(0, idx)) + 1; // 1..5
 }
 
+// Fisher-Yates shuffle so every session sees a fresh order.
+function shuffle(list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export default function SwipeSort() {
   const router = useRouter();
+  const [deck] = useState(() => shuffle(VALUES));
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState({});
   const [dx, setDx] = useState(0);
@@ -23,13 +34,13 @@ export default function SwipeSort() {
   const startX = useRef(0);
   const pointerId = useRef(null);
 
-  const current = VALUES[idx];
-  const done = idx >= VALUES.length;
+  const current = deck[idx];
+  const done = idx >= deck.length;
   const hlTier = dragging || Math.abs(dx) > 0 ? tierFromDx(dx) : null;
 
   const assign = useCallback(
     (tier) => {
-      const v = VALUES[idx];
+      const v = deck[idx];
       if (!v) return;
       setAnswers((a) => ({ ...a, [v.key]: tier }));
       setDx(0);
@@ -41,7 +52,7 @@ export default function SwipeSort() {
 
   const goBack = useCallback(() => {
     if (idx === 0) return;
-    const prev = VALUES[idx - 1];
+    const prev = deck[idx - 1];
     setAnswers((a) => {
       const next = { ...a };
       delete next[prev.key];
@@ -102,7 +113,7 @@ export default function SwipeSort() {
     if (done && !submitting && !error) submit();
   }, [done, submitting, error, submit]);
 
-  const pct = Math.round((idx / VALUES.length) * 100);
+  const pct = Math.round((idx / deck.length) * 100);
 
   if (done) {
     return (
@@ -123,7 +134,7 @@ export default function SwipeSort() {
   return (
     <div className="survey">
       <div className="progress"><span style={{ width: `${pct}%` }} /></div>
-      <div className="counter">{idx + 1} of {VALUES.length}</div>
+      <div className="counter">{idx + 1} of {deck.length}</div>
 
       <div className="stage">
         <div
