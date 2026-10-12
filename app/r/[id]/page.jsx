@@ -53,7 +53,13 @@ export default async function ResultPage({ params }) {
       <ResultActions />
       <div style={{ height: 8 }} />
       <ValuesMap answers={record.answers} />
-      <p className="muted" style={{ marginTop: 28 }}>
+      {record.groupCode && (
+        <p className="muted" style={{ marginTop: 28 }}>
+          You sorted as part of a group.{" "}
+          <Link href={`/g/${record.groupCode}`}>See everyone side by side</Link>.
+        </p>
+      )}
+      <p className="muted" style={{ marginTop: record.groupCode ? 8 : 28 }}>
         This page is private to whoever has the link. <Link href="/sort">Take the sort yourself</Link>.
       </p>
     </main>
