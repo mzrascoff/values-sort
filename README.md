@@ -4,6 +4,10 @@ A quick, anonymous card sort of personal values. People swipe or tap 104 values 
 importance tiers and get a shareable themed "values map." No login. Each submission is stored
 under a random ID and lives at a stable, unlisted link (`/r/{id}`).
 
+Several people can also sort together. One of them starts a group, shares the invite link, and
+everyone's maps land on a single page (`/g/{code}`) showing the themes side by side plus the
+shared core, the shared periphery, and the widest splits.
+
 Built with Next.js (App Router) and Upstash Redis (Vercel KV), designed to deploy on Vercel.
 
 ## Stack
@@ -34,10 +38,25 @@ Open http://localhost:3000. Without KV env vars the app runs, but submitting sho
 
 ## Routes
 
-- `/` — intro and start
-- `/sort` — the swipe/tap survey
-- `/api/submit` — POST answers, returns a new `{ id }`
+- `/` — intro, start, and the control for starting or opening a group
+- `/sort` — the swipe/tap survey; `/sort?g={code}` joins a group and asks for a name first
+- `/api/submit` — POST `{ answers, group?, label? }`, returns `{ id, group }`
+- `/api/group` — POST `{ title? }`, returns a new `{ code }`
 - `/r/{id}` — the saved, shareable results map
+- `/g/{code}` — the group comparison
+
+## Groups
+
+A group is a short code plus a Redis list of the sorts filed under it. Members are appended to
+`group:{code}:members` rather than rewritten into the group object, so two people finishing at the
+same moment cannot overwrite each other. A group holds up to `GROUP_LIMIT` (12) sorts.
+
+The comparison only reads values that *every* member sorted, so a partial sort narrows the
+comparison instead of breaking it. `buildGroupModel` in `lib/values.js` produces the theme table
+and the three lists; `components/GroupCompare.jsx` renders them.
+
+Inside a group, the name a person types is shown next to their map — that is the one place the app
+attaches a label to a sort. Everything else stays anonymous.
 
 ## Editing the value list
 
@@ -46,5 +65,9 @@ Add or remove entries there; the survey and the map update automatically.
 
 ## Privacy
 
-Submissions are anonymous. No names, no accounts. Results pages are unlisted and marked
+Submissions are anonymous. No accounts. Results and group pages are unlisted and marked
 `noindex`, so only someone with the link can open a given map.
+
+The one exception is a group: members type a first name or nickname so the comparison can label
+the columns, and anyone holding the group code can add a sort to it and read the comparison. Treat
+a group code like the link it is.

@@ -22,11 +22,15 @@ function shuffle(list) {
   return a;
 }
 
-export default function SwipeSort() {
+export default function SwipeSort({ group = null }) {
   const router = useRouter();
   const [deck] = useState(() => shuffle(VALUES));
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [label, setLabel] = useState("");
+  // Sorting alone starts straight away; joining a group needs a name first, so
+  // the comparison has something to put at the top of each column.
+  const [joined, setJoined] = useState(!group);
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -65,13 +69,13 @@ export default function SwipeSort() {
   // Keyboard: 1-5 assigns, backspace goes back.
   useEffect(() => {
     function onKey(e) {
-      if (done || submitting) return;
+      if (!joined || done || submitting) return;
       if (e.key >= "1" && e.key <= "5") assign(Number(e.key));
       else if (e.key === "Backspace") { e.preventDefault(); goBack(); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [assign, goBack, done, submitting]);
+  }, [assign, goBack, done, submitting, joined]);
 
   function onPointerDown(e) {
     if (submitting) return;
@@ -98,7 +102,9 @@ export default function SwipeSort() {
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify(
+          group ? { answers, group: group.code, label: label.trim() } : { answers }
+        ),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
       const { id } = await res.json();
@@ -107,13 +113,44 @@ export default function SwipeSort() {
       setError(err.message || "Something went wrong");
       setSubmitting(false);
     }
-  }, [answers, router]);
+  }, [answers, router, group, label]);
 
   useEffect(() => {
     if (done && !submitting && !error) submit();
   }, [done, submitting, error, submit]);
 
   const pct = Math.round((idx / deck.length) * 100);
+
+  if (!joined) {
+    return (
+      <div className="survey">
+        <h1>Join {group.title ? `“${group.title}”` : "the group"}</h1>
+        <p className="sub">
+          What should the others call you? First name or a nickname is plenty — it labels your
+          column in the comparison and nothing else.
+        </p>
+        <form
+          className="gate"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (label.trim()) setJoined(true);
+          }}
+        >
+          <input
+            className="input"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Your name"
+            maxLength={24}
+            autoFocus
+          />
+          <button className="btn" type="submit" disabled={!label.trim()}>
+            Start the sort
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (done) {
     return (
@@ -134,7 +171,6 @@ export default function SwipeSort() {
   return (
     <div className="survey">
       <div className="progress"><span style={{ width: `${pct}%` }} /></div>
-      <div className="counter">{idx + 1} of {deck.length}</div>
 
       <div className="stage">
         <div
