@@ -67,6 +67,16 @@ export default async function GroupPage({ params }) {
     )
   ).filter(Boolean);
 
+  // Two people who both typed "Sam" get "Sam" and "Sam (2)", so the columns and the links below
+  // can be told apart. Matched case-insensitively; first to finish keeps the plain name.
+  const used = new Set();
+  for (const m of members) {
+    let label = m.label;
+    for (let n = 2; used.has(label.trim().toLowerCase()); n++) label = `${m.label} (${n})`;
+    used.add(label.trim().toLowerCase());
+    m.label = label;
+  }
+
   const heading = group.title || "Your group's values";
 
   return (
