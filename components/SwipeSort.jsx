@@ -24,7 +24,10 @@ function shuffle(list) {
 
 export default function SwipeSort({ group = null }) {
   const router = useRouter();
-  const [deck] = useState(() => shuffle(VALUES));
+  // Picked after mount, not in the useState initializer: the server render and the client's first
+  // render must match, and two independent Math.random() orders never do (React errors #418, #423,
+  // #425). Until the effect runs, `deck` is null and the card renders empty, at its full size.
+  const [deck, setDeck] = useState(null);
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState({});
   const [label, setLabel] = useState("");
@@ -38,24 +41,30 @@ export default function SwipeSort({ group = null }) {
   const startX = useRef(0);
   const pointerId = useRef(null);
 
-  const current = deck[idx];
-  const done = idx >= deck.length;
+  useEffect(() => {
+    setDeck(shuffle(VALUES));
+  }, []);
+
+  const ready = deck !== null;
+  const current = ready ? deck[idx] : null;
+  // `ready` matters here: an empty placeholder deck must never read as a finished sort.
+  const done = ready && idx >= deck.length;
   const hlTier = dragging || Math.abs(dx) > 0 ? tierFromDx(dx) : null;
 
   const assign = useCallback(
     (tier) => {
-      const v = deck[idx];
+      const v = deck && deck[idx];
       if (!v) return;
       setAnswers((a) => ({ ...a, [v.key]: tier }));
       setDx(0);
       setDragging(false);
       setIdx((i) => i + 1);
     },
-    [idx]
+    [deck, idx]
   );
 
   const goBack = useCallback(() => {
-    if (idx === 0) return;
+    if (!deck || idx === 0) return;
     const prev = deck[idx - 1];
     setAnswers((a) => {
       const next = { ...a };
@@ -64,21 +73,21 @@ export default function SwipeSort({ group = null }) {
     });
     setDx(0);
     setIdx((i) => i - 1);
-  }, [idx]);
+  }, [deck, idx]);
 
   // Keyboard: 1-5 assigns, backspace goes back.
   useEffect(() => {
     function onKey(e) {
-      if (!joined || done || submitting) return;
+      if (!joined || !ready || done || submitting) return;
       if (e.key >= "1" && e.key <= "5") assign(Number(e.key));
       else if (e.key === "Backspace") { e.preventDefault(); goBack(); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [assign, goBack, done, submitting, joined]);
+  }, [assign, goBack, ready, done, submitting, joined]);
 
   function onPointerDown(e) {
-    if (submitting) return;
+    if (!ready || submitting) return;
     setDragging(true);
     startX.current = e.clientX;
     pointerId.current = e.pointerId;
@@ -119,7 +128,7 @@ export default function SwipeSort({ group = null }) {
     if (done && !submitting && !error) submit();
   }, [done, submitting, error, submit]);
 
-  const pct = Math.round((idx / deck.length) * 100);
+  const pct = ready ? Math.round((idx / deck.length) * 100) : 0;
 
   if (!joined) {
     return (
@@ -155,6 +164,7 @@ export default function SwipeSort({ group = null }) {
   if (done) {
     return (
       <div className="survey" style={{ textAlign: "center" }}>
+        <h1 className="sr-only">Sort your values</h1>
         <div className="progress"><span style={{ width: "100%" }} /></div>
         <p className="counter" style={{ marginTop: 30, fontSize: 16 }}>
           {error ? error : "Building your values map…"}
@@ -170,6 +180,7 @@ export default function SwipeSort({ group = null }) {
 
   return (
     <div className="survey">
+      <h1 className="sr-only">Sort your values</h1>
       <div className="progress"><span style={{ width: `${pct}%` }} /></div>
 
       <div className="stage">
@@ -184,8 +195,9 @@ export default function SwipeSort({ group = null }) {
             transition: dragging ? "none" : "transform 0.2s ease",
           }}
         >
-          <div className="vname">{current.name}</div>
-          <div className="vdef">{current.def}</div>
+          {/* Non-breaking spaces hold the card's height while the order is being picked. */}
+          <div className="vname">{current ? current.name : "\u00a0"}</div>
+          <div className="vdef">{current ? current.def : "\u00a0"}</div>
           <div className="card-hint">swipe toward a tier, tap below, or press 1&ndash;5</div>
         </div>
       </div>
