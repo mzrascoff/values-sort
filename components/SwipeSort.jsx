@@ -12,6 +12,61 @@ function tierFromDx(dx) {
   return Math.min(4, Math.max(0, idx)) + 1; // 1..5
 }
 
+// Progress survives a reload: the deck order, position, answers, and group name are kept in
+// sessionStorage, one entry per solo sort or group, and cleared once the sort is saved. Storage
+// can be missing or throw (private windows, blocked site data), so every access is wrapped and
+// the sort simply starts fresh without it.
+const VALUE_KEYS = new Set(VALUES.map((v) => v.key));
+const VALUE_BY_KEY = Object.fromEntries(VALUES.map((v) => [v.key, v]));
+
+function storageKey(group) {
+  return `values-sort:progress:${group ? group.code : "solo"}`;
+}
+
+function loadProgress(group) {
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(storageKey(group)) || "null");
+    if (!saved || !Array.isArray(saved.order)) return null;
+    // Only resume a deck that is exactly today's values, so an edit to lib/values.js between
+    // visits can't leave a card missing or a stale one in the middle.
+    const order = saved.order;
+    if (order.length !== VALUES.length || new Set(order).size !== order.length) return null;
+    if (!order.every((k) => VALUE_KEYS.has(k))) return null;
+    const idx = Number.isInteger(saved.idx) && saved.idx >= 0 && saved.idx <= order.length ? saved.idx : 0;
+    const answers = {};
+    for (const k of order.slice(0, idx)) {
+      const t = saved.answers && saved.answers[k];
+      if (!Number.isInteger(t) || t < 1 || t > 5) return null;
+      answers[k] = t;
+    }
+    return {
+      deck: order.map((k) => VALUE_BY_KEY[k]),
+      idx,
+      answers,
+      label: typeof saved.label === "string" ? saved.label.slice(0, 24) : "",
+      joined: saved.joined === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveProgress(group, state) {
+  try {
+    window.sessionStorage.setItem(storageKey(group), JSON.stringify(state));
+  } catch {
+    // Storage full or blocked: the sort still works, it just won't survive a reload.
+  }
+}
+
+function clearProgress(group) {
+  try {
+    window.sessionStorage.removeItem(storageKey(group));
+  } catch {
+    // Nothing to clean up if storage was never reachable.
+  }
+}
+
 // Fisher-Yates shuffle so every session sees a fresh order.
 function shuffle(list) {
   const a = [...list];
@@ -41,9 +96,26 @@ export default function SwipeSort({ group = null }) {
   const startX = useRef(0);
   const pointerId = useRef(null);
 
+  // Once per mount: resume this tab's sort if there is one, otherwise shuffle a fresh deck.
   useEffect(() => {
-    setDeck(shuffle(VALUES));
+    const saved = loadProgress(group);
+    if (saved) {
+      setDeck(saved.deck);
+      setIdx(saved.idx);
+      setAnswers(saved.answers);
+      if (group && saved.joined && saved.label.trim()) {
+        setLabel(saved.label);
+        setJoined(true);
+      }
+    } else {
+      setDeck(shuffle(VALUES));
+    }
   }, []);
+
+  useEffect(() => {
+    if (!deck) return;
+    saveProgress(group, { order: deck.map((v) => v.key), idx, answers, label, joined });
+  }, [deck, idx, answers, label, joined, group]);
 
   const ready = deck !== null;
   const current = ready ? deck[idx] : null;
@@ -117,6 +189,7 @@ export default function SwipeSort({ group = null }) {
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
       const { id } = await res.json();
+      clearProgress(group);
       router.push(`/r/${id}`);
     } catch (err) {
       setError(err.message || "Something went wrong");
