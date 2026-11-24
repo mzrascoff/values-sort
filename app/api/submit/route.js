@@ -3,7 +3,7 @@ import {
   kvConfigured,
   getGroup,
   addGroupMember,
-  countGroupMembers,
+  removeGroupMember,
   GROUP_LIMIT,
 } from "@/lib/kv";
 import { makeId, normalizeCode } from "@/lib/id";
@@ -57,18 +57,6 @@ export async function POST(request) {
     if (!group) {
       return Response.json({ error: "That group no longer exists" }, { status: 404 });
     }
-    let count = 0;
-    try {
-      count = await countGroupMembers(code);
-    } catch {
-      count = 0;
-    }
-    if (count >= GROUP_LIMIT) {
-      return Response.json(
-        { error: `A group holds up to ${GROUP_LIMIT} sorts. Start another one.` },
-        { status: 409 }
-      );
-    }
   }
 
   const rawLabel = typeof (body && body.label) === "string" ? body.label.trim() : "";
@@ -81,19 +69,31 @@ export async function POST(request) {
     record.label = label;
   }
 
+  // Claim the group place first: the append is the atomic check on the size
+  // limit (see addGroupMember), so nothing is saved for a sort the full group
+  // turns away.
+  const member = group ? { id, label, createdAt: record.createdAt } : null;
+  if (group) {
+    let added = false;
+    try {
+      added = await addGroupMember(group.code, member);
+    } catch {
+      return Response.json({ error: "Could not join the group. Try again." }, { status: 500 });
+    }
+    if (!added) {
+      return Response.json(
+        { error: `A group holds up to ${GROUP_LIMIT} sorts. Start another one.` },
+        { status: 409 }
+      );
+    }
+  }
+
   try {
     await saveSort(id, record);
   } catch {
+    // Give the place back so a failed save doesn't use up one of the twelve.
+    if (group) await removeGroupMember(group.code, member).catch(() => {});
     return Response.json({ error: "Could not save your results" }, { status: 500 });
-  }
-
-  if (group) {
-    try {
-      await addGroupMember(group.code, { id, label, createdAt: record.createdAt });
-    } catch {
-      // The sort is saved and reachable at its own link; the group page simply
-      // will not list it. Better than losing the answers.
-    }
   }
 
   return Response.json({ id, group: group ? group.code : null });
