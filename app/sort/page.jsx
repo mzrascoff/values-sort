@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Sort your values" };
 
-export default async function SortPage({ searchParams }) {
+export default async function SortPage(props) {
+  const searchParams = await props.searchParams;
   const code = normalizeCode(searchParams && searchParams.g);
 
   if (!code) return <SwipeSort />;

@@ -12,7 +12,7 @@ Built with Next.js (App Router) and Upstash Redis (Vercel KV), designed to deplo
 
 ## Stack
 
-- Next.js 14, React 18
+- Next.js 16, React 19
 - `@upstash/redis` for storage (Vercel KV via the Upstash Marketplace integration)
 - No database schema, no auth
 

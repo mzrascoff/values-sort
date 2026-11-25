@@ -12,7 +12,8 @@ export const metadata = {
   robots: { index: false },
 };
 
-export default async function GroupPage({ params }) {
+export default async function GroupPage(props) {
+  const params = await props.params;
   if (!kvConfigured) {
     return (
       <main className="wrap narrow">
